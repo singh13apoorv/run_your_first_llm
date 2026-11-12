@@ -1,6 +1,6 @@
 # Output (Parameters, Tensors, Dtype and Memory should be same across devices)
 
-## Apple Silicon
+## Apple Silicon M5 Pro
 
 ```
 $ uv run python 02_inspect.py

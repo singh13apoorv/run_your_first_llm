@@ -1,6 +1,6 @@
 # Throughput from different GPUs
 
-## Apple M5 Pro
+## Apple Silicon M5 Pro
 ```
 $ uv run python 05_throughput.py
 Loading weights: 100%|██████████████████████| 291/291 [00:02<00:00, 108.85it/s]
