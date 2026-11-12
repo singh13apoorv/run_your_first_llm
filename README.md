@@ -67,6 +67,14 @@ uv run hf download NousResearch/Meta-Llama-3.1-8B \
     --revision 1f47e50cdbe801ad8a5174156ec3a0655108fb9f --exclude "original/*"
 ```
 
+Optional: log in to Hugging Face. It isn't needed for this ungated model, but it is for gated repos
+such as Meta's official `meta-llama/...` models (create a **Read** token under
+Settings → Access Tokens on huggingface.co):
+
+```
+uv run hf auth login
+```
+
 - **No login is needed.** `NousResearch/Meta-Llama-3.1-8B` is an ungated copy of Meta's base model.
 - **The revision is pinned** so everyone downloads exactly the same files. The code loads this same revision.
 - **`--exclude "original/*"`** skips a second copy of the weights in Meta's own format, which transformers doesn't use. That saves 16 GB.
