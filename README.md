@@ -22,18 +22,29 @@ Llama 3.1 8B in BF16, greedy decoding, 256 new tokens, median of 3 runs after a 
 
 ```
 run_your_first_llm/
-├── server.py            # FastAPI server: /generate and /stream
-├── run.sh               # one command: sync the environment, start the server
+├── src/run_your_first_llm/
+│   ├── server.py          # FastAPI server: /generate and /stream
+│   ├── run.sh             # one command: sync the environment, start the server
+│   └── __init__.py
 ├── examples/
-│   ├── common.py        # device selection, pinned model, loading helpers
-│   ├── 01_tokenize.py   # text → token IDs and back
-│   ├── 02_inspect.py    # parameters, tensors, dtype, memory
-│   ├── 03_generate.py   # greedy vs sampled vs seeded generation
-│   ├── 04_stream.py     # stream tokens as they're generated
-│   └── 05_throughput.py # tokens/s and effective bandwidth
+│   ├── common.py          # device selection, pinned model, loading helpers
+│   ├── 01_tokenize.py     # text → token IDs and back
+│   ├── 02_inspect.py      # parameters, tensors, dtype, memory
+│   ├── 03_generate.py     # greedy vs sampled vs seeded generation
+│   ├── 04_stream.py       # stream tokens as they're generated
+│   └── 05_throughput.py   # tokens/s and effective bandwidth
+├── results/
+│   ├── 01_tokenize.md     # real output from each example, per machine
+│   ├── 02_inspect.md
+│   ├── 03_generate.md
+│   ├── 04_stream.md
+│   └── 05_throughput.md
+├── server_out.md          # server logs and responses, per machine
 ├── pyproject.toml
-└── uv.lock              # every dependency pinned
+└── uv.lock                # every dependency pinned
 ```
+
+Each example's real output is in `results/`, e.g. [`results/05_throughput.md`](results/05_throughput.md).
 
 Each example has a matching `*_out.md` file with real output from my runs.
 
@@ -83,7 +94,7 @@ uv run python 01_tokenize.py
 
 Terminal 1:
 ```
-bash run.sh
+bash src/run_your_first_llm/run.sh
 ```
 
 Terminal 2:
