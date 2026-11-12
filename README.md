@@ -11,9 +11,13 @@ Built while working through Module 01 ("Run Your First LLM") of the [Fanout Infe
 | Device | Decode speed | Effective bandwidth | Spec bandwidth | % of peak |
 |---|---|---|---|---|
 | Apple M5 Pro (MPS) | 17.2 tok/s | 276 GB/s | 307 GB/s | 90% |
-| NVIDIA RTX 4090 (CUDA) | _pending_ | _pending_ | 1,008 GB/s | _pending_ |
+| NVIDIA RTX 4090 (CUDA) | 38.7 tok/s | 622 GB/s | 1,008 GB/s | 61.7% |
 | NVIDIA H100 (CUDA) | _pending_ | _pending_ | 3,350 GB/s | _pending_ |
 
+NVIDIA RTX 4090 specification:
+```
+2.15.0+cu132 13.2 NVIDIA GeForce RTX 4090 (8, 9)
+```
 Llama 3.1 8B in BF16, greedy decoding, 256 new tokens, median of 3 runs after a warm-up. See [`examples/05_throughput.py`](examples/05_throughput.py).
 
 **Why bandwidth?** Generating one token reads all ~16 GB of weights from memory once. The math itself is quick, so decoding is limited by memory bandwidth: the speed ceiling is roughly `bandwidth ÷ 16 GB` tokens per second. "Effective bandwidth" is `tok/s × 16.06 GB`, and the last column shows how close each machine gets to its hardware limit.
@@ -46,7 +50,7 @@ run_your_first_llm/
 
 Each example's real output is in `results/`, e.g. [`results/05_throughput.md`](results/05_throughput.md).
 
-Each example has a matching `*_out.md` file with real output from my runs.
+Each example has a matching `*.md` file with real output from my runs.
 
 ## Requirements
 
@@ -118,7 +122,7 @@ curl -N localhost:8000/stream -H "Content-Type: application/json" \
 
 ### On a remote GPU box
 
-1. On the box, inside `tmux`, run the setup steps above, then `bash run.sh`.
+1. On the box, inside `tmux`, run the setup steps above, then `bash src/run_your_first_llm/run.sh`.
 2. On your laptop, open an SSH tunnel and keep it open:
    ```
    ssh -L 8000:localhost:8000 <your-ssh-alias>
