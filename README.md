@@ -10,17 +10,17 @@ Built while working through Module 01 ("Run Your First LLM") of the [Fanout Infe
 
 | Device | Decode speed | Effective bandwidth | Spec bandwidth | % of peak |
 |---|---|---|---|---|
-| Apple M5 Pro (MPS) | 17.2 tok/s | 276 GB/s | 307 GB/s | 90% |
-| NVIDIA RTX 4090 (CUDA) | 38.7 tok/s | 622 GB/s | 1,008 GB/s | 61.7% |
-| NVIDIA H100 (CUDA) | _pending_ | _pending_ | 3,350 GB/s | _pending_ |
+| Apple M5 Pro, 48 GB unified memory (MPS) | 17.2 tok/s | 276 GB/s | 307 GB/s | 90% |
+| NVIDIA RTX 4090, 24 GB (CUDA) | 38.7 tok/s | 622 GB/s | 1,008 GB/s | 62% |
+| NVIDIA H100 SXM, 80 GB HBM3 (CUDA) | 83.0 tok/s | 1,333 GB/s | 3,350 GB/s | 40% |
 
-NVIDIA RTX 4090 specification:
-```
-2.15.0+cu132 13.2 NVIDIA GeForce RTX 4090 (8, 9)
-```
-Llama 3.1 8B in BF16, greedy decoding, 256 new tokens, median of 3 runs after a warm-up. See [`examples/05_throughput.py`](examples/05_throughput.py).
+Llama 3.1 8B in BF16, greedy decoding, 256 new tokens, median of 3 runs after a warm-up. The prompt is 6 tokens, so prefill is a negligible part of each run. See [`examples/05_throughput.py`](examples/05_throughput.py) and the raw output in [`results/05_throughput.md`](results/05_throughput.md).
+
+Test machines: torch 2.15.0, with the CUDA 13.2 build on both GPUs (compute capability 8.9 and 9.0). The GPUs were rented on Vast.ai; the H100's host CPU was an Intel Xeon Platinum 8568Y+.
 
 **Why bandwidth?** Generating one token reads all ~16 GB of weights from memory once. The math itself is quick, so decoding is limited by memory bandwidth: the speed ceiling is roughly `bandwidth ÷ 16 GB` tokens per second. "Effective bandwidth" is `tok/s × 16.06 GB`, and the last column shows how close each machine gets to its hardware limit.
+
+**Why faster GPUs get further from their limit.** At batch size 1, each token runs about a thousand small GPU kernels, launched one by one from Python. On the Mac, those launches hide behind slow memory reads, so it reaches 90% of peak. On faster GPUs the memory reads finish sooner and launch overhead takes a bigger share: 62% on the 4090 and 40% on the H100. On the H100, reading the weights takes about 4.8 ms per token, but each token takes about 12 ms. The H100 is still the fastest here, at 2.1x the 4090, but well short of the 3.3x its bandwidth would allow. Removing that overhead (CUDA graphs, `torch.compile`, or an engine like vLLM) is the next step after this module.
 
 ## What's inside
 
@@ -43,14 +43,15 @@ run_your_first_llm/
 │   ├── 03_generate.md
 │   ├── 04_stream.md
 │   └── 05_throughput.md
+├── run_all.sh             # detects the machine, runs examples 01-05, saves logs
+├── serve.sh               # starts the server and saves its log
+├── curl_server.sh         # sends both requests and saves the responses
 ├── server_out.md          # server logs and responses, per machine
 ├── pyproject.toml
 └── uv.lock                # every dependency pinned
 ```
 
-Each example's real output is in `results/`, e.g. [`results/05_throughput.md`](results/05_throughput.md).
-
-Each example has a matching `*.md` file with real output from my runs.
+Each example's real output, for every machine, is in `results/`. `logs/` holds raw output from each run and isn't committed.
 
 ## Requirements
 
@@ -65,15 +66,14 @@ The lock file installs the right PyTorch build automatically: the CUDA 13.2 buil
 ## Setup
 
 ```
-git clone <repo-url> && cd run_your_first_llm
+git clone https://github.com/singh13apoorv/run_your_first_llm.git
+cd run_your_first_llm
 uv sync
 uv run hf download NousResearch/Meta-Llama-3.1-8B \
     --revision 1f47e50cdbe801ad8a5174156ec3a0655108fb9f --exclude "original/*"
 ```
 
-Optional: log in to Hugging Face. It isn't needed for this ungated model, but it is for gated repos
-such as Meta's official `meta-llama/...` models (create a **Read** token under
-Settings → Access Tokens on huggingface.co):
+Optional: log in to Hugging Face. It isn't needed for this ungated model, but it is for gated repos such as Meta's official `meta-llama/...` models (create a **Read** token under Settings → Access Tokens on huggingface.co):
 
 ```
 uv run hf auth login
@@ -85,7 +85,15 @@ uv run hf auth login
 
 ## Examples
 
-Run them from the `examples/` folder:
+Run everything on the current machine with one command:
+
+```
+bash run_all.sh
+```
+
+It names the machine from its hardware (`m5pro`, `rtx4090`, `h100-sxm`, and so on), records the hardware and versions, and runs examples 01-05, each in its own process, saving the output to `logs/<machine>/`. Pass a name to override it: `bash run_all.sh mybox`.
+
+Or run a single example from the `examples/` folder:
 
 ```
 cd examples
@@ -122,12 +130,12 @@ curl -N localhost:8000/stream -H "Content-Type: application/json" \
 
 ### On a remote GPU box
 
-1. On the box, inside `tmux`, run the setup steps above, then `bash src/run_your_first_llm/run.sh`.
+1. On the box, inside `tmux`, run the setup steps above, then `bash serve.sh`. It starts the server with `run.sh` and saves its log to `logs/<machine>/server.txt`.
 2. On your laptop, open an SSH tunnel and keep it open:
    ```
    ssh -L 8000:localhost:8000 <your-ssh-alias>
    ```
-3. In another terminal on your laptop, run the same curl commands as above.
+3. In another terminal on your laptop, run `bash curl_server.sh <machine>`, or the same curl commands as above. The script saves both responses to `logs/<machine>/`.
 
 The server listens only on `127.0.0.1`, so it's reachable through your SSH tunnel and not from the open internet.
 
@@ -145,9 +153,10 @@ This is a **base** model: it continues text rather than answering like an assist
 
 ## Notes and findings
 
-- **Greedy output matches across machines here:** the M5 Pro produced the same continuation the course recorded on an H100. That's typical but not guaranteed: tiny floating-point differences between hardware can change one token, and with it everything after.
-- **Seeded sampling repeats only on the same machine.** Apple GPUs and NVIDIA GPUs use different random number generators, so the same seed gives different text on each.
-- **Measuring memory on Apple Silicon:** after loading, `torch.mps.current_allocated_memory()` reports 0 GB, because the weights reach the GPU without going through PyTorch's allocator on unified memory. `torch.mps.driver_allocated_memory()` shows the real 16.07 GB. CUDA's `torch.cuda.memory_allocated()` counts the weights normally.
+- **Greedy output matches across machines here:** the M5 Pro, the RTX 4090 and the H100 produced the same continuation, which also matches the course's H100 reference. That's typical but not guaranteed: tiny floating-point differences between hardware can change one token, and with it everything after.
+- **Seeded sampling repeats only on the same machine.** With seed 42, each machine repeats its own text exactly, but all three produce different text, including the two NVIDIA GPUs. The random number generator and the order of floating-point operations both differ between devices.
+- **The H100 needed more than one warm-up.** Its first timed run took 9.11 s, three times as long as the next two (3.09 s and 3.02 s). The median ignores it, but a single timed run would have understated the H100 by two thirds.
+- **Measuring memory on Apple Silicon:** after loading, `torch.mps.current_allocated_memory()` reports 0 GB, because the weights reach the GPU without going through PyTorch's allocator on unified memory. `torch.mps.driver_allocated_memory()` shows the real 16.07 GB. CUDA's `torch.cuda.memory_allocated()` counts the weights normally (16.06 GB on both GPUs).
 - **Timing GPU work:** GPU operations run asynchronously, so the throughput script waits for the GPU to finish (`synchronize`) before stopping the clock. Without that, timings come out too fast.
 
 ## License
